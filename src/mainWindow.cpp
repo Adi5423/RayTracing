@@ -31,6 +31,8 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool rightMousePressed = false;
 CollisionManager collisionMgr;
+bool showCollisionBoxes = false;
+bool gKeyPressed = false;
 
 // -----------------------------
 // Callbacks
@@ -63,6 +65,17 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 void processInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    // Toggle collision box visualization with G key
+    if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
+        if (!gKeyPressed) {
+            showCollisionBoxes = !showCollisionBoxes;
+            gKeyPressed = true;
+            std::cout << "Collision boxes: " << (showCollisionBoxes ? "VISIBLE" : "HIDDEN") << "\n";
+        }
+    } else {
+        gKeyPressed = false;
+    }
 
     // Camera movement with collision detection
     camera.processKeyboard(window, deltaTime, &collisionMgr);
@@ -124,6 +137,7 @@ int main()
     std::cout << "  Q/E        - Move up/down\n";
     std::cout << "  SHIFT      - Sprint (4x speed)\n";
     std::cout << "  Mouse Move - Look around\n";
+    std::cout << "  G          - Toggle collision box visualization\n";
     std::cout << "  ESC        - Exit\n";
     std::cout << "Collision detection: ENABLED\n";
     std::cout << "=======================\n\n";
@@ -133,6 +147,7 @@ int main()
     // -----------------------------
     std::cout << "Loading shaders...\n";
     Shader cubeShader("src/cube.vert", "src/cube.frag");
+    Shader lineShader("src/line.vert", "src/line.frag");
     std::cout << "Shaders loaded successfully!\n";
 
     // -----------------------------
@@ -243,41 +258,61 @@ int main()
     // -----------------------------
     collisionMgr.clear();
     
-    // Cube collision box (positioned at 0, 1, 0 with size 1x1x1)
+    // Cube collision box (EXACT match: positioned at 0, 1, 0 with size 1x1x1)
+    // Just slightly larger  (0.01 padding) for smooth collision
     collisionMgr.addBox(AABB(
-        glm::vec3(-0.5f, 0.5f, -0.5f),  // min
-        glm::vec3(0.5f, 1.5f, 0.5f)     // max
+        glm::vec3(-0.51f, 0.49f, -0.51f),  // min
+        glm::vec3(0.51f, 1.51f, 0.51f)     // max
     ));
 
-    // Platform collision - floor (prevent going below y=0.3 which is camera eye height)
+    // Platform collision - floor (EXACT match: at y=0 with tiny margin)
+    // Keep camera at realistic eye height (0.05 units above platform)
     collisionMgr.addBox(AABB(
-        glm::vec3(-5.0f, -1.0f, -5.0f),
-        glm::vec3(5.0f, 0.3f, 5.0f)
+        glm::vec3(-5.0f, -0.5f, -5.0f),
+        glm::vec3(5.0f, 0.05f, 5.0f)
     ));
 
-    // Platform collision - walls around the edges (invisible boundaries)
-    // North wall
+    // Platform collision - walls around the edges (at platform boundaries)
+    // North wall (at -Z edge)
     collisionMgr.addBox(AABB(
-        glm::vec3(-5.0f, 0.0f, -5.5f),
-        glm::vec3(5.0f, 5.0f, -5.0f)
+        glm::vec3(-5.0f, 0.0f, -5.1f),
+        glm::vec3(5.0f, 3.0f, -5.0f)
     ));
-    // South wall
+    // South wall (at +Z edge)
     collisionMgr.addBox(AABB(
         glm::vec3(-5.0f, 0.0f, 5.0f),
-        glm::vec3(5.0f, 5.0f, 5.5f)
+        glm::vec3(5.0f, 3.0f, 5.1f)
     ));
-    // West wall
+    // West wall (at -X edge)
     collisionMgr.addBox(AABB(
-        glm::vec3(-5.5f, 0.0f, -5.0f),
-        glm::vec3(-5.0f, 5.0f, 5.0f)
+        glm::vec3(-5.1f, 0.0f, -5.0f),
+        glm::vec3(-5.0f, 3.0f, 5.0f)
     ));
-    // East wall
+    // East wall (at +X edge)
     collisionMgr.addBox(AABB(
         glm::vec3(5.0f, 0.0f, -5.0f),
-        glm::vec3(5.5f, 5.0f, 5.0f)
+        glm::vec3(5.1f, 3.0f, 5.0f)
     ));
 
     std::cout << "Collision system initialized with " << collisionMgr.boxes.size() << " collision boxes!\n";
+
+    // -----------------------------
+    // Setup Collision Box Visualization VAO/VBO
+    // -----------------------------
+    unsigned int collisionVAO, collisionVBO;
+    glGenVertexArrays(1, &collisionVAO);
+    glGenBuffers(1, &collisionVBO);
+
+    glBindVertexArray(collisionVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, collisionVBO);
+    
+    // We'll update this buffer dynamically when rendering
+    // Allocate enough space for wireframe lines
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * 1000, nullptr, GL_DYNAMIC_DRAW);
+    
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
 
     // -----------------------------
     // Generate a Perlin Noise map
@@ -361,6 +396,30 @@ int main()
         
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
+        // -----------------------------
+        // Render Collision Boxes (if enabled)
+        // -----------------------------
+        if (showCollisionBoxes) {
+            // Get wireframe vertices from collision manager
+            auto wireframeVerts = collisionMgr.getWireframeVertices();
+            
+            if (!wireframeVerts.empty()) {
+                // Use line shader
+                lineShader.use();
+                lineShader.setMat4("view", view);
+                lineShader.setMat4("projection", projection);
+                lineShader.setVec3("lineColor", glm::vec3(0.0f, 1.0f, 0.0f)); // Bright green
+                
+                // Update VBO with wireframe data
+                glBindBuffer(GL_ARRAY_BUFFER, collisionVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, wireframeVerts.size() * sizeof(glm::vec3), wireframeVerts.data());
+                
+                // Draw lines
+                glBindVertexArray(collisionVAO);
+                glDrawArrays(GL_LINES, 0, wireframeVerts.size());
+            }
+        }
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -370,6 +429,8 @@ int main()
     glDeleteBuffers(1, &cubeVBO);
     glDeleteVertexArrays(1, &platformVAO);
     glDeleteBuffers(1, &platformVBO);
+    glDeleteVertexArrays(1, &collisionVAO);
+    glDeleteBuffers(1, &collisionVBO);
 
     glfwDestroyWindow(window);
     glfwTerminate();

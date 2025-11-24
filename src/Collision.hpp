@@ -113,4 +113,41 @@ public:
         // Can't move, return old position
         return oldPos;
     }
+
+    // Generate wireframe vertices for all collision boxes
+    std::vector<glm::vec3> getWireframeVertices() const {
+        std::vector<glm::vec3> vertices;
+        
+        for (const auto& box : boxes) {
+            // Get the 8 corners of the box
+            glm::vec3 corners[8] = {
+                glm::vec3(box.min.x, box.min.y, box.min.z), // 0
+                glm::vec3(box.max.x, box.min.y, box.min.z), // 1
+                glm::vec3(box.max.x, box.max.y, box.min.z), // 2
+                glm::vec3(box.min.x, box.max.y, box.min.z), // 3
+                glm::vec3(box.min.x, box.min.y, box.max.z), // 4
+                glm::vec3(box.max.x, box.min.y, box.max.z), // 5
+                glm::vec3(box.max.x, box.max.y, box.max.z), // 6
+                glm::vec3(box.min.x, box.max.y, box.max.z)  // 7
+            };
+
+            // 12 edges of the box (each edge = 2 vertices)
+            int edges[12][2] = {
+                // Bottom face
+                {0, 1}, {1, 2}, {2, 3}, {3, 0},
+                // Top face
+                {4, 5}, {5, 6}, {6, 7}, {7, 4},
+                // Vertical edges
+                {0, 4}, {1, 5}, {2, 6}, {3, 7}
+            };
+
+            // Add line segments for each edge
+            for (int i = 0; i < 12; i++) {
+                vertices.push_back(corners[edges[i][0]]);
+                vertices.push_back(corners[edges[i][1]]);
+            }
+        }
+        
+        return vertices;
+    }
 };

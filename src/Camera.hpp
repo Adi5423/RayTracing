@@ -50,7 +50,7 @@ public:
         sprintMultiplier(4.0f),
         mouseSensitivity(0.1f),
         zoom(45.0f),
-        collisionRadius(0.3f),
+        collisionRadius(0.1f),
         firstMouse(true),
         lastX(400.0f),
         lastY(300.0f)
