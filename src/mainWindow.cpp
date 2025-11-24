@@ -19,9 +19,9 @@
 #include "Collision.hpp"
 
 // Include RelNo_D1
-#include "Noise.hpp"
+// #include "Noise.hpp"
 
-using namespace Noise;
+// using namespace Noise;
 
 // -----------------------------
 // Global state
@@ -277,12 +277,12 @@ int main()
         glm::vec3 padding = glm::vec3(0.0f, 0.0f, 0.0f);   // No extra padding needed
     } floorCollision;
     
-    // --- PLATFORM WALLS COLLISION PARAMETERS ---
-    struct {
-        float thickness = 0.05f;      // How thick the walls are (Z or X direction)
-        float height = 0.1f;          // How tall the walls are (Y direction)
-        float platformRadius = 5.0f;  // Distance from center to edge
-    } wallCollision;
+    // // --- PLATFORM WALLS COLLISION PARAMETERS ---
+    // struct {
+    //     float thickness = 0.05f;      // How thick the walls are (Z or X direction)
+    //     float height = 0.1f;          // How tall the walls are (Y direction)
+    //     float platformRadius = 5.0f;  // Distance from center to edge
+    // } wallCollision;
     
     // ==============================
     // BUILD COLLISION BOXES FROM PARAMETERS
@@ -307,35 +307,35 @@ int main()
     }
     
     // WALL collision boxes (4 walls around platform)
-    {
-        float r = wallCollision.platformRadius;
-        float t = wallCollision.thickness;
-        float h = wallCollision.height;
+    // {
+    //     float r = wallCollision.platformRadius;
+    //     float t = wallCollision.thickness;
+    //     float h = wallCollision.height;
         
-        // North wall (at -Z edge)
-        collisionMgr.addBox(AABB(
-            glm::vec3(-r, 0.0f, -r - t),
-            glm::vec3(r, h, -r)
-        ));
+    //     // North wall (at -Z edge)
+    //     collisionMgr.addBox(AABB(
+    //         glm::vec3(-r, 0.0f, -r - t),
+    //         glm::vec3(r, h, -r)
+    //     ));
         
-        // South wall (at +Z edge)
-        collisionMgr.addBox(AABB(
-            glm::vec3(-r, 0.0f, r),
-            glm::vec3(r, h, r + t)
-        ));
+    //     // South wall (at +Z edge)
+    //     collisionMgr.addBox(AABB(
+    //         glm::vec3(-r, 0.0f, r),
+    //         glm::vec3(r, h, r + t)
+    //     ));
         
-        // West wall (at -X edge)
-        collisionMgr.addBox(AABB(
-            glm::vec3(-r - t, 0.0f, -r),
-            glm::vec3(-r, h, r)
-        ));
+    //     // West wall (at -X edge)
+    //     collisionMgr.addBox(AABB(
+    //         glm::vec3(-r - t, 0.0f, -r),
+    //         glm::vec3(-r, h, r)
+    //     ));
         
-        // East wall (at +X edge)
-        collisionMgr.addBox(AABB(
-            glm::vec3(r, 0.0f, -r),
-            glm::vec3(r + t, h, r)
-        ));
-    }
+    //     // East wall (at +X edge)
+    //     collisionMgr.addBox(AABB(
+    //         glm::vec3(r, 0.0f, -r),
+    //         glm::vec3(r + t, h, r)
+    //     ));
+    // }
 
     std::cout << "Collision system initialized with " << collisionMgr.boxes.size() << " collision boxes!\n";
 
@@ -360,23 +360,23 @@ int main()
     // -----------------------------
     // Generate a Perlin Noise map
     // -----------------------------
-    std::cout << "Generating Perlin noise using RelNo_D1...\n";
+    // std::cout << "Generating Perlin noise using RelNo_D1...\n";
 
-    auto noiseMap = create_perlinnoise(
-        256, 256,
-        40.0f,     // scale
-        4,         // octaves
-        1.0f,      // frequency
-        0.5f,      // persistence
-        2.0f,      // lacunarity
-        0.0f,      // base offset
-        21,        // seed
-        OutputMode::None,
-        ""
-    );
+    // auto noiseMap = create_perlinnoise(
+    //     256, 256,
+    //     40.0f,     // scale
+    //     4,         // octaves
+    //     1.0f,      // frequency
+    //     0.5f,      // persistence
+    //     2.0f,      // lacunarity
+    //     0.0f,      // base offset
+    //     21,        // seed
+    //     OutputMode::None,
+    //     ""
+    // );
 
-    std::cout << "Noise generated! Sample value = "
-              << noiseMap[100][100] << "\n";
+    // std::cout << "Noise generated! Sample value = "
+    //           << noiseMap[100][100] << "\n";
 
     // Light properties
     glm::vec3 lightPos(3.0f, 5.0f, 3.0f);
