@@ -15,6 +15,9 @@
 // Include Shader utility
 #include "Shader.hpp"
 
+// Include Collision detection
+#include "Collision.hpp"
+
 // Include RelNo_D1
 #include "Noise.hpp"
 
@@ -27,6 +30,7 @@ Camera camera(glm::vec3(0.0f, 2.0f, 8.0f));
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool rightMousePressed = false;
+CollisionManager collisionMgr;
 
 // -----------------------------
 // Callbacks
@@ -60,8 +64,8 @@ void processInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Camera movement (handled in Camera class)
-    camera.processKeyboard(window, deltaTime);
+    // Camera movement with collision detection
+    camera.processKeyboard(window, deltaTime, &collisionMgr);
 }
 
 // -----------------------------
@@ -118,9 +122,10 @@ int main()
     std::cout << "Hold RIGHT MOUSE BUTTON to activate camera\n";
     std::cout << "  WASD       - Move forward/left/back/right\n";
     std::cout << "  Q/E        - Move up/down\n";
-    std::cout << "  SHIFT      - Sprint (2x speed)\n";
+    std::cout << "  SHIFT      - Sprint (4x speed)\n";
     std::cout << "  Mouse Move - Look around\n";
     std::cout << "  ESC        - Exit\n";
+    std::cout << "Collision detection: ENABLED\n";
     std::cout << "=======================\n\n";
 
     // -----------------------------
@@ -232,6 +237,47 @@ int main()
     glEnableVertexAttribArray(1);
 
     std::cout << "Cube and platform geometry created!\n";
+
+    // -----------------------------
+    // Setup Collision Boxes
+    // -----------------------------
+    collisionMgr.clear();
+    
+    // Cube collision box (positioned at 0, 1, 0 with size 1x1x1)
+    collisionMgr.addBox(AABB(
+        glm::vec3(-0.5f, 0.5f, -0.5f),  // min
+        glm::vec3(0.5f, 1.5f, 0.5f)     // max
+    ));
+
+    // Platform collision - floor (prevent going below y=0.3 which is camera eye height)
+    collisionMgr.addBox(AABB(
+        glm::vec3(-5.0f, -1.0f, -5.0f),
+        glm::vec3(5.0f, 0.3f, 5.0f)
+    ));
+
+    // Platform collision - walls around the edges (invisible boundaries)
+    // North wall
+    collisionMgr.addBox(AABB(
+        glm::vec3(-5.0f, 0.0f, -5.5f),
+        glm::vec3(5.0f, 5.0f, -5.0f)
+    ));
+    // South wall
+    collisionMgr.addBox(AABB(
+        glm::vec3(-5.0f, 0.0f, 5.0f),
+        glm::vec3(5.0f, 5.0f, 5.5f)
+    ));
+    // West wall
+    collisionMgr.addBox(AABB(
+        glm::vec3(-5.5f, 0.0f, -5.0f),
+        glm::vec3(-5.0f, 5.0f, 5.0f)
+    ));
+    // East wall
+    collisionMgr.addBox(AABB(
+        glm::vec3(5.0f, 0.0f, -5.0f),
+        glm::vec3(5.5f, 5.0f, 5.0f)
+    ));
+
+    std::cout << "Collision system initialized with " << collisionMgr.boxes.size() << " collision boxes!\n";
 
     // -----------------------------
     // Generate a Perlin Noise map

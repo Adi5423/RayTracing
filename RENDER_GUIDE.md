@@ -38,10 +38,19 @@ The camera starts at position `(0, 2, 8)` looking at the scene.
 **Hold RIGHT MOUSE BUTTON** to activate camera movement:
 - **W/A/S/D** - Move forward/left/back/right
 - **Q/E** - Move up/down
-- **SHIFT** - Sprint mode (2x speed)
+- **SHIFT** - Sprint mode (4x speed) ⚡
 - **Mouse** - Look around
 - **Scroll Wheel** - Zoom in/out (Field of View)
 - **ESC** - Exit application
+
+### 🛡️ Collision Detection
+**NEW!** The camera now has collision detection enabled:
+- ✅ **Can't walk through the cube**
+- ✅ **Can't fall through the platform**
+- ✅ **Can't leave the platform boundaries** (invisible walls)
+- ✅ **Smooth sliding along walls** when hitting them at an angle
+
+See **COLLISION_GUIDE.md** for technical details.
 
 ---
 
@@ -57,9 +66,13 @@ The camera starts at position `(0, 2, 8)` looking at the scene.
   - Calculates ambient, diffuse, and specular lighting
   - Outputs final colored pixel
 
-### Classes
-- **Camera.hpp**: First-person camera controller
+### Classes & Systems
+- **Camera.hpp**: First-person camera controller with collision detection
 - **Shader.hpp**: Shader loading and uniform management utility
+- **Collision.hpp**: Sphere-AABB collision detection system
+  - `CollisionManager`: Manages all collidable objects
+  - `AABB`: Axis-Aligned Bounding Box structure
+  - `Sphere`: Sphere collider for camera
 
 ### Main Components
 - **VAO/VBO** for cube geometry (36 vertices, 6 faces)
@@ -96,8 +109,9 @@ Now that you have basic rendering working, you can:
 ## 📝 Key Files
 
 - `src/mainWindow.cpp` - Main application and rendering loop
-- `src/Camera.hpp` - Camera controller
+- `src/Camera.hpp` - Camera controller with collision detection
 - `src/Shader.hpp` - Shader utility class
+- `src/Collision.hpp` - Collision detection system
 - `src/cube.vert` - Vertex shader (GLSL)
 - `src/cube.frag` - Fragment shader (GLSL)
 

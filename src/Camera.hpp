@@ -32,6 +32,7 @@ public:
     float sprintMultiplier;
     float mouseSensitivity;
     float zoom;
+    float collisionRadius;
 
     // Mouse state
     bool firstMouse;
@@ -46,9 +47,10 @@ public:
         float pitch = 0.0f
     ) : front(glm::vec3(0.0f, 0.0f, -1.0f)),
         movementSpeed(2.5f),
-        sprintMultiplier(2.0f),
+        sprintMultiplier(4.0f),
         mouseSensitivity(0.1f),
         zoom(45.0f),
+        collisionRadius(0.3f),
         firstMouse(true),
         lastX(400.0f),
         lastY(300.0f)
@@ -70,8 +72,9 @@ public:
         return glm::perspective(glm::radians(zoom), aspectRatio, 0.1f, 100.0f);
     }
 
-    // Process keyboard input
-    void processKeyboard(GLFWwindow* window, float deltaTime) {
+    // Process keyboard input with collision detection
+    template<typename CollisionManagerPtr>
+    void processKeyboard(GLFWwindow* window, float deltaTime, CollisionManagerPtr collisionMgr = nullptr) {
         // Only process movement when right mouse button is held
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS) {
             return;
@@ -85,21 +88,30 @@ public:
             velocity *= sprintMultiplier;
         }
 
+        glm::vec3 newPosition = position;
+
         // WASD movement
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            position += front * velocity;
+            newPosition += front * velocity;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            position -= front * velocity;
+            newPosition -= front * velocity;
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            position -= right * velocity;
+            newPosition -= right * velocity;
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            position += right * velocity;
+            newPosition += right * velocity;
 
         // Q/E for vertical movement
         if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-            position += worldUp * velocity;
+            newPosition += worldUp * velocity;
         if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-            position -= worldUp * velocity;
+            newPosition -= worldUp * velocity;
+
+        // Apply collision detection if manager is provided
+        if (collisionMgr != nullptr) {
+            position = collisionMgr->resolveCollision(position, newPosition, collisionRadius);
+        } else {
+            position = newPosition;
+        }
     }
 
     // Process mouse movement
