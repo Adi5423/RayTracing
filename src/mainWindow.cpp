@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <vector>
+#include <sstream>
+#include <iomanip>
 
 // Include GLM for camera math
 #include <glm/glm.hpp>
@@ -17,6 +19,9 @@
 
 // Include Collision detection
 #include "Collision.hpp"
+
+// Include Gizmo system
+#include "Gizmo.hpp"
 
 // Include RelNo_D1
 // #include "Noise.hpp"
@@ -34,6 +39,11 @@ CollisionManager collisionMgr;
 bool showCollisionBoxes = false;
 bool gKeyPressed = false;
 
+// Gizmo and object selection
+GizmoState gizmoState;
+glm::vec3 cubePosition = glm::vec3(0.0f, 1.0f, 0.0f);  // Current cube position
+bool cubeSelected = true;  // Cube is selected by default
+
 // -----------------------------
 // Callbacks
 // -----------------------------
@@ -45,7 +55,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.processMouseScroll(static_cast<float>(yoffset));
 }
 
+// Mouse state for gizmo interaction
+double lastMouseX = 0.0, lastMouseY = 0.0;
+bool leftMousePressed = false;
+int hoveredGizmoAxis = -1;  // -1 = none, 0 = X, 1 = Y, 2 = Z
+
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    // Right mouse - camera control
     if (button == GLFW_MOUSE_BUTTON_RIGHT) {
         if (action == GLFW_PRESS) {
             rightMousePressed = true;
@@ -54,6 +70,21 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         else if (action == GLFW_RELEASE) {
             rightMousePressed = false;
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+    }
+    
+    // Left mouse - gizmo interaction
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS && cubeSelected && hoveredGizmoAxis >= 0) {
+            // Start dragging on gizmo axis
+            leftMousePressed = true;
+            glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
+            gizmoState.startDrag(hoveredGizmoAxis, cubePosition, cubePosition);
+        }
+        else if (action == GLFW_RELEASE) {
+            // Stop dragging
+            leftMousePressed = false;
+            gizmoState.endDrag();
         }
     }
 }
@@ -77,8 +108,41 @@ void processInput(GLFWwindow* window) {
         gKeyPressed = false;
     }
 
-    // Camera movement with collision detection
-    camera.processKeyboard(window, deltaTime, &collisionMgr);
+    // Handle gizmo dragging
+    if (gizmoState.active && leftMousePressed) {
+        double currentMouseX, currentMouseY;
+        glfwGetCursorPos(window, &currentMouseX, &currentMouseY);
+        
+        // Calculate mouse delta
+        double deltaX = currentMouseX - lastMouseX;
+        double deltaY = currentMouseY - lastMouseY;
+        
+        // Convert mouse movement to 3D movement along the selected axis
+        glm::vec3 axisVector = gizmoState.getAxisVector();
+        float dragSensitivity = 0.01f;  // Adjust this for faster/slower dragging
+        
+        // Use horizontal mouse movement for X and Z, vertical for Y
+        float movement = 0.0f;
+        if (gizmoState.selectedAxis == 0) {  // X axis
+            movement = static_cast<float>(deltaX) * dragSensitivity;
+        } else if (gizmoState.selectedAxis == 1) {  // Y axis
+            movement = static_cast<float>(-deltaY) * dragSensitivity;  // Negative because screen Y is inverted
+        } else if (gizmoState.selectedAxis == 2) {  // Z axis
+            movement = static_cast<float>(deltaX) * dragSensitivity;
+        }
+        
+        // Apply movement
+        cubePosition += axisVector * movement;
+        
+        // Update last mouse position
+        lastMouseX = currentMouseX;
+        lastMouseY = currentMouseY;
+    }
+
+    // Camera movement with collision detection (only when not dragging gizmo)
+    if (!gizmoState.active) {
+        camera.processKeyboard(window, deltaTime, &collisionMgr);
+    }
 }
 
 // -----------------------------
@@ -358,6 +422,41 @@ int main()
     glEnableVertexAttribArray(0);
 
     // -----------------------------
+    // Setup Coordinate Axes VAO/VBO
+    // -----------------------------
+    auto axesVerts = generateCoordinateAxes(100.0f);  // Long axes for scene
+    
+    unsigned int axesVAO, axesVBO;
+    glGenVertexArrays(1, &axesVAO);
+    glGenBuffers(1, &axesVBO);
+    
+    glBindVertexArray(axesVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, axesVBO);
+    glBufferData(GL_ARRAY_BUFFER, axesVerts.size() * sizeof(glm::vec3), axesVerts.data(), GL_STATIC_DRAW);
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // -----------------------------
+    // Setup Translation Gizmo VAO/VBO
+    // -----------------------------
+    auto gizmoArrows = generateTranslationGizmo(1.5f, 0.05f);
+    
+    unsigned int gizmoVAO, gizmoVBO;
+    glGenVertexArrays(1, &gizmoVAO);
+    glGenBuffers(1, &gizmoVBO);
+    
+    glBindVertexArray(gizmoVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, gizmoVBO);
+    // Dynamic buffer for gizmo
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * 100, nullptr, GL_DYNAMIC_DRAW);
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    std::cout << "Coordinate axes and gizmo initialized!\n";
+
+    // -----------------------------
     // Generate a Perlin Noise map
     // -----------------------------
     // std::cout << "Generating Perlin noise using RelNo_D1...\n";
@@ -397,6 +496,51 @@ int main()
         // Process input
         processInput(window);
 
+        // Update window title with camera coordinates
+        std::stringstream title;
+        title << "Ray Tracer | Camera: X=" << std::fixed << std::setprecision(1) 
+              << camera.position.x << " Y=" << camera.position.y << " Z=" << camera.position.z;
+        glfwSetWindowTitle(window, title.str().c_str());
+
+        // Simple gizmo hover detection (screen-space)
+        if (cubeSelected && !rightMousePressed) {
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+            
+            // Convert to normalized device coordinates
+            float ndcX = (mouseX / 1280.0f) * 2.0f - 1.0f;
+            float ndcY = 1.0f - (mouseY / 720.0f) * 2.0f;
+            
+            // Project cube position to screen
+            glm::mat4 view = camera.getViewMatrix();
+            glm::mat4 projection = camera.getProjectionMatrix(1280.0f / 720.0f);
+            glm::vec4 clipPos = projection * view * glm::vec4(cubePosition, 1.0f);
+            glm::vec3 ndcPos = glm::vec3(clipPos) / clipPos.w;
+            
+            // Check distance to each gizmo arrow endpoint
+            hoveredGizmoAxis = -1;
+            float minDist = 0.05f;  // Detection threshold
+            
+            for (size_t i = 0; i < gizmoArrows.size(); ++i) {
+                // Get arrow end point in world space
+                glm::vec3 arrowEnd = cubePosition + gizmoArrows[i].axis * 1.5f;
+                
+                // Project to screen
+                glm::vec4 endClipPos = projection * view * glm::vec4(arrowEnd, 1.0f);
+                glm::vec3 endNdcPos = glm::vec3(endClipPos) / endClipPos.w;
+                
+                // Calculate distance from mouse to arrow in screen space
+                float dist = glm::length(glm::vec2(endNdcPos.x - ndcX, endNdcPos.y - ndcY));
+                
+                if (dist < minDist) {
+                    minDist = dist;
+                    hoveredGizmoAxis = i;
+                }
+            }
+        } else {
+            hoveredGizmoAxis = -1;
+        }
+
         // Render
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -421,7 +565,7 @@ int main()
         glBindVertexArray(cubeVAO);
         
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 1.0f, 0.0f)); // Position cube above platform
+        model = glm::translate(model, cubePosition); // Use cubePosition variable
         cubeShader.setMat4("model", model);
         cubeShader.setVec3("objectColor", glm::vec3(0.3f, 0.7f, 0.9f)); // Cyan-ish color
         
@@ -438,6 +582,73 @@ int main()
         cubeShader.setVec3("objectColor", glm::vec3(0.5f, 0.5f, 0.5f)); // Gray platform
         
         glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // -----------------------------
+        // Render Coordinate Axes
+        // -----------------------------
+        {
+            lineShader.use();
+            lineShader.setMat4("view", view);
+            lineShader.setMat4("projection", projection);
+            
+            glBindVertexArray(axesVAO);
+            glLineWidth(2.0f);
+            
+            // X axis - Red
+            lineShader.setVec3("lineColor", glm::vec3(1.0f, 0.0f, 0.0f));
+            glDrawArrays(GL_LINES, 0, 2);
+            
+            // Y axis - Green
+            lineShader.setVec3("lineColor", glm::vec3(0.0f, 1.0f, 0.0f));
+            glDrawArrays(GL_LINES, 2, 2);
+            
+            // Z axis - Blue
+            lineShader.setVec3("lineColor", glm::vec3(0.0f, 0.0f, 1.0f));
+            glDrawArrays(GL_LINES, 4, 2);
+            
+            glLineWidth(1.0f);
+        }
+
+        // -----------------------------
+        // Render Translation Gizmo (if object selected)
+        // -----------------------------
+        if (cubeSelected) {
+            lineShader.use();
+            lineShader.setMat4("view", view);
+            lineShader.setMat4("projection", projection);
+            
+            glBindVertexArray(gizmoVAO);
+            glLineWidth(3.0f);
+            
+            // Render each arrow
+            for (size_t i = 0; i < gizmoArrows.size(); ++i) {
+                const auto& arrow = gizmoArrows[i];
+                
+                // Transform vertices to cube position
+                std::vector<glm::vec3> transformedVerts;
+                for (const auto& v : arrow.vertices) {
+                    transformedVerts.push_back(v + cubePosition);
+                }
+                
+                // Upload transformed vertices
+                glBindBuffer(GL_ARRAY_BUFFER, gizmoVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, transformedVerts.size() * sizeof(glm::vec3), transformedVerts.data());
+                
+                // Set color - highlight if hovered or being dragged
+                glm::vec3 color = arrow.color;
+                if ((int)i == hoveredGizmoAxis || (gizmoState.active && (int)i == gizmoState.selectedAxis)) {
+                    color = glm::vec3(1.0f, 1.0f, 0.0f);  // Yellow for highlight
+                    glLineWidth(5.0f);  // Thicker when selected
+                } else {
+                    glLineWidth(3.0f);
+                }
+                
+                lineShader.setVec3("lineColor", color);
+                glDrawArrays(GL_LINES, 0, transformedVerts.size());
+            }
+            
+            glLineWidth(1.0f);
+        }
 
         // -----------------------------
         // Render Collision Boxes (if enabled)
@@ -474,6 +685,10 @@ int main()
     glDeleteBuffers(1, &platformVBO);
     glDeleteVertexArrays(1, &collisionVAO);
     glDeleteBuffers(1, &collisionVBO);
+    glDeleteVertexArrays(1, &axesVAO);
+    glDeleteBuffers(1, &axesVBO);
+    glDeleteVertexArrays(1, &gizmoVAO);
+    glDeleteBuffers(1, &gizmoVBO);
 
     glfwDestroyWindow(window);
     glfwTerminate();
