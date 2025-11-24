@@ -258,41 +258,84 @@ int main()
     // -----------------------------
     collisionMgr.clear();
     
-    // Cube collision box (EXACT match: positioned at 0, 1, 0 with size 1x1x1)
-    // Just slightly larger  (0.01 padding) for smooth collision
-    collisionMgr.addBox(AABB(
-        glm::vec3(-0.51f, 0.49f, -0.51f),  // min
-        glm::vec3(0.51f, 1.51f, 0.51f)     // max
-    ));
-
-    // Platform collision - floor (EXACT match: at y=0 with tiny margin)
-    // Keep camera at realistic eye height (0.05 units above platform)
-    collisionMgr.addBox(AABB(
-        glm::vec3(-5.0f, -0.5f, -5.0f),
-        glm::vec3(5.0f, 0.05f, 5.0f)
-    ));
-
-    // Platform collision - walls around the edges (at platform boundaries)
-    // North wall (at -Z edge)
-    collisionMgr.addBox(AABB(
-        glm::vec3(-5.0f, 0.0f, -5.1f),
-        glm::vec3(5.0f, 3.0f, -5.0f)
-    ));
-    // South wall (at +Z edge)
-    collisionMgr.addBox(AABB(
-        glm::vec3(-5.0f, 0.0f, 5.0f),
-        glm::vec3(5.0f, 3.0f, 5.1f)
-    ));
-    // West wall (at -X edge)
-    collisionMgr.addBox(AABB(
-        glm::vec3(-5.1f, 0.0f, -5.0f),
-        glm::vec3(-5.0f, 3.0f, 5.0f)
-    ));
-    // East wall (at +X edge)
-    collisionMgr.addBox(AABB(
-        glm::vec3(5.0f, 0.0f, -5.0f),
-        glm::vec3(5.1f, 3.0f, 5.0f)
-    ));
+    // ==============================
+    // COLLISION CONFIGURATION
+    // Adjust these parameters to fine-tune collision boxes
+    // ==============================
+    
+    // --- CUBE COLLISION PARAMETERS ---
+    struct {
+        glm::vec3 position = glm::vec3(0.0f, 1.0f, 0.0f);  // Center position
+        glm::vec3 size = glm::vec3(1.0f, 1.0f, 1.0f);      // Base size (matches mesh)
+        glm::vec3 padding = glm::vec3(0.01f, 0.01f, 0.01f); // Extra padding per axis
+    } cubeCollision;
+    
+    // --- PLATFORM FLOOR COLLISION PARAMETERS ---
+    struct {
+        glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);  // Center of platform
+        glm::vec3 size = glm::vec3(10.0f, 0.04f, 10.0f);   // Size: 10×10 in XZ, very thin in Y
+        glm::vec3 padding = glm::vec3(0.0f, 0.0f, 0.0f);   // No extra padding needed
+    } floorCollision;
+    
+    // --- PLATFORM WALLS COLLISION PARAMETERS ---
+    struct {
+        float thickness = 0.05f;      // How thick the walls are (Z or X direction)
+        float height = 0.1f;          // How tall the walls are (Y direction)
+        float platformRadius = 5.0f;  // Distance from center to edge
+    } wallCollision;
+    
+    // ==============================
+    // BUILD COLLISION BOXES FROM PARAMETERS
+    // ==============================
+    
+    // CUBE collision box
+    {
+        glm::vec3 halfSize = (cubeCollision.size + cubeCollision.padding) * 0.5f;
+        collisionMgr.addBox(AABB(
+            cubeCollision.position - halfSize,  // min
+            cubeCollision.position + halfSize   // max
+        ));
+    }
+    
+    // FLOOR collision box
+    {
+        glm::vec3 halfSize = (floorCollision.size + floorCollision.padding) * 0.5f;
+        collisionMgr.addBox(AABB(
+            floorCollision.position - halfSize,  // min
+            floorCollision.position + halfSize   // max
+        ));
+    }
+    
+    // WALL collision boxes (4 walls around platform)
+    {
+        float r = wallCollision.platformRadius;
+        float t = wallCollision.thickness;
+        float h = wallCollision.height;
+        
+        // North wall (at -Z edge)
+        collisionMgr.addBox(AABB(
+            glm::vec3(-r, 0.0f, -r - t),
+            glm::vec3(r, h, -r)
+        ));
+        
+        // South wall (at +Z edge)
+        collisionMgr.addBox(AABB(
+            glm::vec3(-r, 0.0f, r),
+            glm::vec3(r, h, r + t)
+        ));
+        
+        // West wall (at -X edge)
+        collisionMgr.addBox(AABB(
+            glm::vec3(-r - t, 0.0f, -r),
+            glm::vec3(-r, h, r)
+        ));
+        
+        // East wall (at +X edge)
+        collisionMgr.addBox(AABB(
+            glm::vec3(r, 0.0f, -r),
+            glm::vec3(r + t, h, r)
+        ));
+    }
 
     std::cout << "Collision system initialized with " << collisionMgr.boxes.size() << " collision boxes!\n";
 
